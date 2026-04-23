@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { parseArgs, parseComposePorts, renderHelp, renderLinks } from "./index";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
+import { findComposeFile, parseArgs, parseComposePorts, renderHelp, renderLinks } from "./index";
 
 describe("parseArgs", () => {
   test("parses help and version flags", () => {
@@ -11,6 +14,33 @@ describe("parseArgs", () => {
 
   test("rejects unknown arguments", () => {
     expect(() => parseArgs(["--wat"])).toThrow("Unknown argument: --wat");
+  });
+});
+
+describe("findComposeFile", () => {
+  test("finds docker-compose.yml", () => {
+    withTempDir((dir) => {
+      writeFileSync(join(dir, "docker-compose.yml"), "services: {}\n");
+
+      expect(basename(findComposeFile(dir) ?? "")).toBe("docker-compose.yml");
+    });
+  });
+
+  test("finds docker-compose.yaml", () => {
+    withTempDir((dir) => {
+      writeFileSync(join(dir, "docker-compose.yaml"), "services: {}\n");
+
+      expect(basename(findComposeFile(dir) ?? "")).toBe("docker-compose.yaml");
+    });
+  });
+
+  test("prefers docker-compose.yml when both extensions exist", () => {
+    withTempDir((dir) => {
+      writeFileSync(join(dir, "docker-compose.yml"), "services: {}\n");
+      writeFileSync(join(dir, "docker-compose.yaml"), "services: {}\n");
+
+      expect(basename(findComposeFile(dir) ?? "")).toBe("docker-compose.yml");
+    });
   });
 });
 
@@ -99,5 +129,16 @@ describe("rendering", () => {
 
   test("renders help text", () => {
     expect(renderHelp()).toContain("docker-compose.yml");
+    expect(renderHelp()).toContain("docker-compose.yaml");
   });
 });
+
+function withTempDir(callback: (dir: string) => void): void {
+  const dir = mkdtempSync(join(tmpdir(), "ports-test-"));
+
+  try {
+    callback(dir);
+  } finally {
+    rmSync(dir, { force: true, recursive: true });
+  }
+}

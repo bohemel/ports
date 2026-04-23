@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const DEFAULT_COMPOSE_FILE = "docker-compose.yml";
+const COMPOSE_FILE_NAMES = ["docker-compose.yml", "docker-compose.yaml"];
 
 type CliOptions = {
   help: boolean;
@@ -48,7 +48,7 @@ export function renderHelp(): string {
     "Usage:",
     "  ports [options]",
     "",
-    "Looks for docker-compose.yml in the current directory and prints links for services with published TCP ports.",
+    "Looks for docker-compose.yml or docker-compose.yaml in the current directory and prints links for services with published TCP ports.",
     "",
     "Options:",
     "  -v, --version       Show version",
@@ -57,8 +57,15 @@ export function renderHelp(): string {
 }
 
 export function findComposeFile(cwd = process.cwd()): string | undefined {
-  const composeFilePath = join(cwd, DEFAULT_COMPOSE_FILE);
-  return existsSync(composeFilePath) ? composeFilePath : undefined;
+  for (const fileName of COMPOSE_FILE_NAMES) {
+    const composeFilePath = join(cwd, fileName);
+
+    if (existsSync(composeFilePath)) {
+      return composeFilePath;
+    }
+  }
+
+  return undefined;
 }
 
 export function parseComposePorts(composeContent: string): ComposePort[] {
@@ -231,7 +238,7 @@ async function main(args: string[]): Promise<void> {
   const composeFilePath = findComposeFile();
 
   if (!composeFilePath) {
-    throw new Error(`Could not find ${DEFAULT_COMPOSE_FILE} in the current directory.`);
+    throw new Error(`Could not find ${COMPOSE_FILE_NAMES.join(" or ")} in the current directory.`);
   }
 
   const composeContent = readFileSync(composeFilePath, "utf8");
